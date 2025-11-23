@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>随手记账 - 个人财务管家</title>
+    
+    <!-- 引入 Tailwind CSS (样式库) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 引入 React 和 ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- 引入 Babel (用于解析 JSX) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+        /* 隐藏滚动条但保留功能 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // --- 图标组件 (使用 SVG 替代 Lucide-react 以确保单文件运行) ---
+        const Icon = ({ path, className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                {path}
+            </svg>
+        );
+
+        const Icons = {
+            Plus: (props) => <Icon {...props} path={<><path d="M5 12h14"/><path d="M12 5v14"/></>} />,
+            Trash2: (props) => <Icon {...props} path={<><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></>} />,
+            Wallet: (props) => <Icon {...props} path={<><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></>} />,
+            TrendingUp: (props) => <Icon {...props} path={<><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></>} />,
+            TrendingDown: (props) => <Icon {...props} path={<><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></>} />,
+            ArrowRight: (props) => <Icon {...props} path={<><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></>} />,
+            DollarSign: (props) => <Icon {...props} path={<><line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></>} />,
+            Calendar: (props) => <Icon {...props} path={<><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></>} />,
+            PieChart: (props) => <Icon {...props} path={<><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></>} />,
+            List: (props) => <Icon {...props} path={<><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></>} />,
+            Coffee: (props) => <Icon {...props} path={<><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" x2="6" y1="2" y2="4"/><line x1="10" x2="10" y1="2" y2="4"/><line x1="14" x2="14" y1="2" y2="4"/></>} />,
+            Bus: (props) => <Icon {...props} path={<><path d="M8 6v6"/><path d="M15 6v6"/><path d="M2 12h19.6"/><path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3"/><circle cx="7" cy="18" r="2"/><path d="M9 18h5"/><circle cx="16" cy="18" r="2"/></>} />,
+            ShoppingBag: (props) => <Icon {...props} path={<><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></>} />,
+            Home: (props) => <Icon {...props} path={<><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></>} />,
+            Activity: (props) => <Icon {...props} path={<><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></>} />,
+            Layers: (props) => <Icon {...props} path={<><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></>} />,
+            Briefcase: (props) => <Icon {...props} path={<><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></>} />,
+            Gem: (props) => <Icon {...props} path={<><path d="M6 3h12l4 6-10 13L2 9Z"/></>} />,
+            MoreHorizontal: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></>} />,
+        };
+
+        // --- 配置 ---
+        const CATEGORIES = {
+          expense: [
+            { id: 'food', name: '餐饮', color: '#ef4444', icon: Icons.Coffee },
+            { id: 'transport', name: '交通', color: '#f97316', icon: Icons.Bus },
+            { id: 'shopping', name: '购物', color: '#eab308', icon: Icons.ShoppingBag },
+            { id: 'housing', name: '居住', color: '#06b6d4', icon: Icons.Home },
+            { id: 'medical', name: '医疗', color: '#ec4899', icon: Icons.Activity },
+            { id: 'other', name: '其他', color: '#94a3b8', icon: Icons.MoreHorizontal },
+          ],
+          income: [
+            { id: 'salary', name: '工资', color: '#10b981', icon: Icons.Briefcase },
+            { id: 'bonus', name: '奖金', color: '#3b82f6', icon: Icons.Layers },
+            { id: 'investment', name: '理财', color: '#8b5cf6', icon: Icons.Gem },
+            { id: 'other', name: '其他', color: '#94a3b8', icon: Icons.MoreHorizontal },
+          ]
+        };
+
+        const DonutChart = ({ data }) => {
+          const size = 160;
+          const strokeWidth = 20;
+          const radius = (size - strokeWidth) / 2;
+          const circumference = 2 * Math.PI * radius;
+          let accumulatedOffset = 0;
+
+          const total = data.reduce((acc, item) => acc + item.value, 0);
+
+          if (total === 0) {
+            return (
+              <div className="flex flex-col items-center justify-center h-40 text-slate-300">
+                <Icons.PieChart className="w-12 h-12 mb-2 opacity-50" />
+                <span className="text-xs">暂无数据</span>
+              </div>
+            );
+          }
+
+          return (
+            <div className="relative flex items-center justify-center">
+              <svg width={size} height={size} className="transform -rotate-90">
+                {data.map((item, index) => {
+                  const strokeLength = (item.value / total) * circumference;
+                  const strokeDasharray = `${strokeLength} ${circumference}`;
+                  const strokeDashoffset = -accumulatedOffset;
+                  accumulatedOffset += strokeLength;
+
+                  return (
+                    <circle
+                      key={item.name}
+                      cx={size / 2}
+                      cy={size / 2}
+                      r={radius}
+                      fill="transparent"
+                      stroke={item.color}
+                      strokeWidth={strokeWidth}
+                      strokeDasharray={strokeDasharray}
+                      strokeDashoffset={strokeDashoffset}
+                      className="transition-all duration-500 ease-out"
+                    />
+                  );
+                })}
+              </svg>
+              <div className="absolute flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-xs text-slate-400">总计</span>
+                <span className="text-lg font-bold text-slate-700">¥{total.toLocaleString()}</span>
+              </div>
+            </div>
+          );
+        };
+
+        function App() {
+          const [activeTab, setActiveTab] = useState('record');
+          
+          const [transactions, setTransactions] = useState(() => {
+            const saved = localStorage.getItem('expense-tracker-data');
+            if (saved) {
+              const parsed = JSON.parse(saved);
+              return parsed.map(t => ({ ...t, category: t.category || 'other' }));
+            }
+            return [
+              { id: 1, text: '发工资啦', amount: 8500, date: '2023-10-25', type: 'income', category: 'salary' },
+              { id: 2, text: '超市购物', amount: 320, date: '2023-10-26', type: 'expense', category: 'shopping' },
+              { id: 3, text: '请朋友吃饭', amount: 500, date: '2023-10-27', type: 'expense', category: 'food' },
+            ];
+          });
+
+          const [text, setText] = useState('');
+          const [amount, setAmount] = useState('');
+          const [transType, setTransType] = useState('expense');
+          const [category, setCategory] = useState(CATEGORIES.expense[0].id);
+
+          useEffect(() => {
+            localStorage.setItem('expense-tracker-data', JSON.stringify(transactions));
+          }, [transactions]);
+
+          useEffect(() => {
+            setCategory(CATEGORIES[transType][0].id);
+          }, [transType]);
+
+          const { total, income, expense } = useMemo(() => {
+            const amounts = transactions.map(t => t.type === 'income' ? t.amount : -t.amount);
+            const totalVal = amounts.reduce((acc, item) => acc + item, 0).toFixed(2);
+            const incomeVal = transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0).toFixed(2);
+            const expenseVal = transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0).toFixed(2);
+            return { total: totalVal, income: incomeVal, expense: expenseVal };
+          }, [transactions]);
+
+          const chartData = useMemo(() => {
+            const typeTransactions = transactions.filter(t => t.type === transType);
+            const categoryMap = {};
+
+            typeTransactions.forEach(t => {
+              const catId = t.category || 'other';
+              if (!categoryMap[catId]) categoryMap[catId] = 0;
+              categoryMap[catId] += t.amount;
+            });
+
+            const config = CATEGORIES[transType];
+            const data = Object.keys(categoryMap).map(catId => {
+              const catConfig = config.find(c => c.id === catId) || CATEGORIES[transType].find(c => c.id === 'other');
+              return {
+                id: catId,
+                name: catConfig.name,
+                color: catConfig.color,
+                Icon: catConfig.icon,
+                value: categoryMap[catId]
+              };
+            }).sort((a, b) => b.value - a.value);
+
+            return data;
+          }, [transactions, transType]);
+
+          const addTransaction = (e) => {
+            e.preventDefault();
+            if (!text || !amount) return;
+
+            const newTransaction = {
+              id: Math.floor(Math.random() * 100000000),
+              text,
+              amount: +amount,
+              date: new Date().toISOString().split('T')[0],
+              type: transType,
+              category
+            };
+
+            setTransactions([newTransaction, ...transactions]);
+            setText('');
+            setAmount('');
+          };
+
+          const deleteTransaction = (id) => {
+            setTransactions(transactions.filter(transaction => transaction.id !== id));
+          };
+
+          const formatMoney = (amount) => '¥' + Number(amount).toLocaleString('zh-CN', { minimumFractionDigits: 2 });
+
+          const getCategoryConfig = (type, catId) => {
+            const list = CATEGORIES[type] || [];
+            return list.find(c => c.id === catId) || list.find(c => c.id === 'other') || { name: '未知', color: '#cbd5e1', icon: Icons.MoreHorizontal };
+          };
+
+          return (
+            <div className="min-h-screen bg-slate-50 text-slate-800 font-sans selection:bg-indigo-100 pb-24 md:pb-8">
+              <div className="max-w-md mx-auto p-4 md:p-8">
+                
+                {/* Header */}
+                <header className="mb-6 flex items-center justify-between">
+                  <div>
+                    <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                      <Icons.Wallet className="w-8 h-8 text-indigo-600" />
+                      随手记账
+                    </h1>
+                  </div>
+                  <div className="text-right">
+                     <div className="text-xs text-slate-400 font-medium uppercase tracking-wider">当前余额</div>
+                     <div className={`text-xl font-bold ${Number(total) < 0 ? 'text-rose-500' : 'text-slate-900'}`}>
+                        {formatMoney(total)}
+                     </div>
+                  </div>
+                </header>
+
+                {/* Cards */}
+                <div className="grid grid-cols-2 gap-4 mb-8">
+                  <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-3 opacity-10">
+                       <Icons.TrendingUp className="w-12 h-12 text-emerald-500" />
+                    </div>
+                    <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2 block">本月收入</span>
+                    <span className="text-2xl font-bold text-emerald-500">{formatMoney(income)}</span>
+                  </div>
+                  <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-3 opacity-10">
+                       <Icons.TrendingDown className="w-12 h-12 text-rose-500" />
+                    </div>
+                    <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2 block">本月支出</span>
+                    <span className="text-2xl font-bold text-rose-500">{formatMoney(expense)}</span>
+                  </div>
+                </div>
+
+                {/* Content */}
+                {activeTab === 'record' ? (
+                  <>
+                    {/* Form */}
+                    <div className="bg-white rounded-2xl shadow-lg border border-indigo-50 p-6 mb-8">
+                      <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <Icons.Plus className="w-5 h-5 text-indigo-500" />
+                        记一笔
+                      </h3>
+                      <form onSubmit={addTransaction} className="space-y-4">
+                        
+                        <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl">
+                          <button
+                            type="button"
+                            onClick={() => setTransType('expense')}
+                            className={`py-2 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${
+                              transType === 'expense' ? 'bg-white text-rose-500 shadow-sm' : 'text-slate-500'
+                            }`}
+                          >
+                            支出
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setTransType('income')}
+                            className={`py-2 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${
+                              transType === 'income' ? 'bg-white text-emerald-500 shadow-sm' : 'text-slate-500'
+                            }`}
+                          >
+                            收入
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-4 gap-2">
+                          {CATEGORIES[transType].map((cat) => (
+                            <button
+                              key={cat.id}
+                              type="button"
+                              onClick={() => setCategory(cat.id)}
+                              className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all ${
+                                category === cat.id 
+                                  ? `bg-indigo-50 border-indigo-200 text-indigo-700` 
+                                  : 'bg-white border-slate-100 text-slate-500 hover:bg-slate-50'
+                              }`}
+                            >
+                              <cat.icon className={`w-5 h-5 mb-1 ${category === cat.id ? 'text-indigo-600' : 'text-slate-400'}`} />
+                              <span className="text-xs">{cat.name}</span>
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="space-y-3">
+                          <input
+                            type="text"
+                            value={text}
+                            onChange={(e) => setText(e.target.value)}
+                            placeholder="备注（如：早餐）"
+                            className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+                          />
+                          <div className="relative">
+                            <Icons.DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <input
+                              type="number"
+                              value={amount}
+                              onChange={(e) => setAmount(e.target.value)}
+                              placeholder="金额"
+                              className="w-full pl-10 pr-4 py-3 bg-slate-50 border-none rounded-xl text-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+                            />
+                          </div>
+                        </div>
+                        <button
+                          type="submit"
+                          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl shadow-md transition-all active:scale-[0.98] flex justify-center items-center gap-2"
+                        >
+                          确认
+                          <Icons.ArrowRight className="w-4 h-4" />
+                        </button>
+                      </form>
+                    </div>
+
+                    {/* List */}
+                    <div>
+                      <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-4 px-2">近期记录</h3>
+                      <div className="space-y-3">
+                        {transactions.length === 0 ? (
+                          <div className="text-center py-8 text-slate-400 bg-white rounded-2xl border border-dashed border-slate-200">
+                            <p>暂无记录</p>
+                          </div>
+                        ) : (
+                          transactions.slice(0, 10).map((t) => {
+                            const catConfig = getCategoryConfig(t.type, t.category);
+                            const CatIcon = catConfig.icon;
+                            return (
+                              <div key={t.id} className="bg-white p-3 rounded-xl border border-slate-100 flex items-center justify-between shadow-sm">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: `${catConfig.color}20`, color: catConfig.color }}>
+                                    <CatIcon className="w-5 h-5" />
+                                  </div>
+                                  <div>
+                                    <p className="text-slate-800 font-medium text-sm">{t.text}</p>
+                                    <div className="flex gap-2 text-xs text-slate-400">
+                                      <span className="bg-slate-100 px-1.5 py-0.5 rounded">{catConfig.name}</span>
+                                      <span>{t.date}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                   <span className={`font-bold block ${t.type === 'income' ? 'text-emerald-500' : 'text-slate-800'}`}>
+                                    {t.type === 'income' ? '+' : '-'}{Number(t.amount).toFixed(2)}
+                                  </span>
+                                  <button onClick={() => deleteTransaction(t.id)} className="text-xs text-rose-400 hover:text-rose-600 mt-1">删除</button>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  /* Stats Tab */
+                  <div className="animate-in fade-in zoom-in-95 duration-300">
+                    <div className="flex justify-center mb-6">
+                       <div className="bg-slate-100 p-1 rounded-xl inline-flex">
+                          <button onClick={() => setTransType('expense')} className={`px-4 py-1.5 text-sm rounded-lg font-medium transition-all ${transType === 'expense' ? 'bg-white shadow text-rose-500' : 'text-slate-500'}`}>支出分析</button>
+                          <button onClick={() => setTransType('income')} className={`px-4 py-1.5 text-sm rounded-lg font-medium transition-all ${transType === 'income' ? 'bg-white shadow text-emerald-500' : 'text-slate-500'}`}>收入分析</button>
+                       </div>
+                    </div>
+
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 mb-6">
+                      <h3 className="text-center text-slate-800 font-bold mb-6">分类占比</h3>
+                      <DonutChart data={chartData} />
+                    </div>
+
+                    <div className="space-y-3">
+                      {chartData.map((item) => (
+                        <div key={item.id} className="bg-white p-3 rounded-xl border border-slate-100 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-2 h-8 rounded-full" style={{ backgroundColor: item.color }}></div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                 <item.Icon className="w-4 h-4 text-slate-400" />
+                                 <span className="font-medium text-slate-700">{item.name}</span>
+                              </div>
+                              <div className="text-xs text-slate-400 mt-0.5">
+                                {((item.value / (transType === 'income' ? Number(income) : Number(expense))) * 100).toFixed(1)}%
+                              </div>
+                            </div>
+                          </div>
+                          <span className="font-bold text-slate-700">¥{item.value.toFixed(2)}</span>
+                        </div>
+                      ))}
+                      {chartData.length === 0 && (
+                         <div className="text-center py-10 text-slate-400">暂无该类型的统计数据</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom Nav */}
+              <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-8 py-3 pb-safe md:hidden">
+                <div className="flex justify-around items-center">
+                  <button 
+                    onClick={() => setActiveTab('record')}
+                    className={`flex flex-col items-center gap-1 ${activeTab === 'record' ? 'text-indigo-600' : 'text-slate-400'}`}
+                  >
+                    <Icons.List className="w-6 h-6" />
+                    <span className="text-[10px] font-medium">明细</span>
+                  </button>
+                  <div className="w-px h-8 bg-slate-100"></div>
+                  <button 
+                    onClick={() => setActiveTab('stats')}
+                    className={`flex flex-col items-center gap-1 ${activeTab === 'stats' ? 'text-indigo-600' : 'text-slate-400'}`}
+                  >
+                    <Icons.PieChart className="w-6 h-6" />
+                    <span className="text-[10px] font-medium">统计</span>
+                  </button>
+                </div>
+              </div>
+              
+              <div className="hidden md:flex justify-center mt-8 gap-4">
+                  <button onClick={() => setActiveTab('record')} className={`px-6 py-2 rounded-full border ${activeTab === 'record' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200'}`}>记账列表</button>
+                  <button onClick={() => setActiveTab('stats')} className={`px-6 py-2 rounded-full border ${activeTab === 'stats' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200'}`}>图表分析</button>
+              </div>
+            </div>
+          );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
